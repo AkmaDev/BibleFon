@@ -23,10 +23,10 @@ export const books: LivrePageProps[] = [
     pages: 3,
     pageContents: [
       { type: "text", content: <p>Introduction à une autre histoire...</p> },
-      { type: "image", src: "/book/page1.jpg" },
+      { type: "image", src: "/david_goliath.png" },
       {
         type: "mixed",
-        image: "/book/page2.jpg",
+        image: "/david_goliath.png",
         overlay: true,
         content: <p>Texte sur image</p>,
       },
