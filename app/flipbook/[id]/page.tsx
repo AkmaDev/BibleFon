@@ -1,17 +1,27 @@
-// app/flipbook/[id]/page.tsx
-import LivrePageClient from "./LivrePageClient";
+import { notFound } from "next/navigation"
+import { getBookById } from "@/lib/books"
+import { ReaderClient } from "./ReaderClient"
+import type { Metadata } from "next"
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>
 }
 
-// Page côté serveur (Server Component) – doit être async pour Next.js
-export default async function LivrePage({ params }: PageProps) {
-  const { id } = params;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params
+  const book = getBookById(id)
+  if (!book) return { title: "Livre introuvable" }
+  return {
+    title: `${book.title} — BibleFon`,
+    description: book.description,
+  }
+}
 
-  // On peut faire des appels API ici si besoin avant de passer à LivrePageClient
-  // Par exemple : const book = await fetchBook(id);
+export default async function ReaderPage({ params }: PageProps) {
+  const { id } = await params
+  const book = getBookById(id)
 
-  // On passe juste l'id au composant client
-  return <LivrePageClient id={id} />;
+  if (!book) notFound()
+
+  return <ReaderClient book={book} />
 }
