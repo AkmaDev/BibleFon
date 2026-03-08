@@ -49,7 +49,15 @@ Ce n'est pas une application de divertissement. C'est une tentative concrète de
 
 ## Ce qui a été accompli
 
-En partant de zéro, j'ai conçu et développé l'ensemble du projet :
+BibleFon a été conçu et réalisé en collaboration avec **Claude Code**, un assistant de programmation par intelligence artificielle développé par Anthropic. C'est une précision qui me tient à cœur, parce qu'elle est honnête — et parce qu'elle fait partie du sujet.
+
+Ce que j'ai apporté : la vision, les choix, les arbitrages. Quel public ? Quelle langue ? Quel format ? Quelles histoires, et comment les raconter ? Pourquoi le fon et pas une autre langue ? À quel moment une illustration est juste ou ne l'est pas ? Ces questions n'ont pas de réponse technique — elles demandent une intention, une sensibilité, une connaissance du terrain.
+
+Ce que Claude Code a apporté : l'exécution technique. Écrire le code, configurer les outils, débugger, déployer. Le bras, pas la tête.
+
+Travailler ainsi — diriger un outil IA vers un objectif précis, en gardant le sens du projet — est lui-même une compétence. Peut-être même l'une des compétences clés du numérique à venir.
+
+Voilà ce qui a été construit ensemble :
 
 **Le livre numérique animé** — un lecteur de type flipbook (livre qui se feuillette), avec des animations fluides, adapté aussi bien aux téléphones mobiles qu'aux ordinateurs.
 
