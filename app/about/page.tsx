@@ -196,7 +196,7 @@ export default function AboutPage() {
           </h2>
           <div className="flex flex-col sm:flex-row gap-3">
             <a
-              href="mailto:akpovimanasse@gmail.com"
+              href="mailto:manasse.akpovi@manasseakpovi.com"
               className="inline-flex items-center gap-3 px-5 py-3 rounded-full text-sm font-medium
                 transition-all duration-200 hover:scale-105"
               style={{
