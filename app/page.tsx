@@ -13,6 +13,21 @@ export default function HomePage() {
   return (
     <main className="min-h-screen" style={{ background: "var(--background)" }}>
 
+      {/* ── Nav ── */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
+        style={{ background: "linear-gradient(to bottom, rgba(8,6,4,0.7) 0%, transparent 100%)" }}>
+        <span className="font-bold text-white text-base" style={{ fontFamily: "var(--font-serif)" }}>
+          BibleFon
+        </span>
+        <Link
+          href="/about"
+          className="text-sm px-4 py-1.5 rounded-full transition-all duration-200
+            hover:text-white text-white/60 border border-white/10 hover:border-white/25"
+        >
+          À propos
+        </Link>
+      </nav>
+
       {/* ── Hero ── */}
       <section className="relative min-h-[92vh] flex flex-col items-center justify-center overflow-hidden px-4">
 

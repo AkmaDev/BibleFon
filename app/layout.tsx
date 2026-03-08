@@ -21,8 +21,7 @@ export const metadata: Metadata = {
   keywords: ["Bible", "Fon", "Bénin", "histoires pour enfants", "langue fon", "audio"],
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico" },
+      { url: "/icon.svg", type: "image/svg+xml" },
     ],
   },
   openGraph: {
