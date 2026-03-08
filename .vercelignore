@@ -1,5 +1,3 @@
-# Fichiers volumineux exclus du CLI upload (servis depuis GitHub build)
-public/illustrations
-public/audio
+# Exclusions CLI Vercel — ne pas toucher aux assets publics
 node_modules
 .next
