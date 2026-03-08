@@ -1,4 +1,5 @@
 import Image from "next/image"
+import Link from "next/link"
 import { BookGrid } from "@/components/library/BookGrid"
 import { Volume2, BookOpen, Users } from "lucide-react"
 
@@ -129,16 +130,26 @@ export default function HomePage() {
               Histoires bibliques en langue fon
             </p>
           </div>
-          <p className="text-xs text-[var(--muted-foreground)] text-center">
-            Audio propulsé par{" "}
-            <a href="https://huggingface.co/facebook/mms-tts-fon"
-              target="_blank" rel="noopener noreferrer"
-              className="hover:underline"
-              style={{ color: "var(--gold-dark)" }}>
-              Meta MMS-TTS-FON
-            </a>
-            {" "}· Illustrations par IA
-          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-xs text-[var(--muted-foreground)]">
+            <span>
+              Audio propulsé par{" "}
+              <a href="https://huggingface.co/facebook/mms-tts-fon"
+                target="_blank" rel="noopener noreferrer"
+                className="hover:underline"
+                style={{ color: "var(--gold-dark)" }}>
+                Meta MMS-TTS-FON
+              </a>
+              {" "}· Illustrations par IA
+            </span>
+            <span className="hidden sm:inline" style={{ color: "var(--border)" }}>·</span>
+            <Link
+              href="/about"
+              className="hover:underline transition-colors"
+              style={{ color: "var(--gold-dark)" }}
+            >
+              À propos du projet
+            </Link>
+          </div>
         </div>
       </footer>
     </main>
