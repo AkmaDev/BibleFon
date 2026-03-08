@@ -13,14 +13,20 @@ import type { Book, PageContent } from "@/lib/books"
    autoCenter:false → on gère le centrage manuellement
    Pas de classe "hard" sur les couvertures → toutes les pages fluides
 ───────────────────────────────────────────── */
-const CDN_JQUERY = "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
-const CDN_TURNJS = "https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"
+const CDN_JQUERY          = "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
+const CDN_JQUERY_SRI      = "sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
+const CDN_TURNJS          = "https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"
+const CDN_TURNJS_SRI      = "sha512-rFun1mEMg3sNDcSjeGP35cLIycsS+og/QtN6WWnoSviHU9ykMLNQp7D1uuG1AzTV2w0VmyFVpszi2QJwiVW6oQ=="
 
-function loadScript(src: string): Promise<void> {
+function loadScript(src: string, integrity?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
     const s = document.createElement("script")
     s.src = src
+    if (integrity) {
+      s.integrity  = integrity
+      s.crossOrigin = "anonymous"
+    }
     s.onload  = () => resolve()
     s.onerror = () => reject(new Error(`Script load failed: ${src}`))
     document.head.appendChild(s)
@@ -38,15 +44,20 @@ function turnJs(el: HTMLElement): any {
 ───────────────────────────────────────────── */
 
 function useAudio() {
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [playing,      setPlaying]      = useState(false)
-  const [loading,      setLoading]      = useState(false)
-  const [error,        setError]        = useState<string | null>(null)
+  const audioRef   = useRef<HTMLAudioElement | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
+  const [playing,       setPlaying]      = useState(false)
+  const [loading,       setLoading]      = useState(false)
+  const [error,         setError]        = useState<string | null>(null)
   const [currentSegIdx, setCurrentSegIdx] = useState<number | null>(null)
 
   const stop = useCallback(() => {
     audioRef.current?.pause()
     audioRef.current = null
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current)
+      blobUrlRef.current = null
+    }
     setPlaying(false)
     setCurrentSegIdx(null)
   }, [])
@@ -66,6 +77,7 @@ function useAudio() {
         throw new Error((e as { error?: string }).error ?? "Erreur TTS")
       }
       const url = URL.createObjectURL(await res.blob())
+      blobUrlRef.current = url
       const a   = new Audio(url)
       a.onended = () => setPlaying(false)
       a.play()
@@ -890,8 +902,8 @@ export function StoryReader({ book }: { book: Book }) {
 
     ;(async () => {
       try {
-        await loadScript(CDN_JQUERY)
-        await loadScript(CDN_TURNJS)
+        await loadScript(CDN_JQUERY, CDN_JQUERY_SRI)
+        await loadScript(CDN_TURNJS, CDN_TURNJS_SRI)
         if (!mounted || !flipbookRef.current) return
 
         const fb = flipbookRef.current
@@ -995,11 +1007,11 @@ export function StoryReader({ book }: { book: Book }) {
 
   /* ── Audio : fichiers pré-enregistrés ou TTS ── */
   const hasAudio = !!(currentAudioFiles?.length || currentFon)
-  const handleSpeak = () => {
+  const handleSpeak = useCallback(() => {
     if (audio.playing) { audio.toggle(); return }
     if (currentAudioFiles?.length) { audio.playFiles(currentAudioFiles); return }
     if (currentFon) audio.speak(currentFon)
-  }
+  }, [audio, currentAudioFiles, currentFon])
   const toggleLang = () => setLang(l => l === "fr" ? "fon" : "fr")
 
   /* ── États des boutons ── */
