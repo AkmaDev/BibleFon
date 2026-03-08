@@ -200,3 +200,21 @@
   background-clip: text;
   animation: shimmer 4s linear infinite;
 }
+
+/* ── 3D Page Flip ── */
+@keyframes flip-out-next { from{transform:rotateY(0deg)} to{transform:rotateY(-90deg)} }
+@keyframes flip-in-next  { from{transform:rotateY(90deg)} to{transform:rotateY(0deg)} }
+@keyframes flip-out-prev { from{transform:rotateY(0deg)} to{transform:rotateY(90deg)} }
+@keyframes flip-in-prev  { from{transform:rotateY(-90deg)} to{transform:rotateY(0deg)} }
+
+/* Ouverture livre : spread apparaît depuis la gauche */
+@keyframes book-open  { from{transform:rotateY(-50deg) scaleX(0.7);opacity:0.35} to{transform:rotateY(0) scaleX(1);opacity:1} }
+/* Fermeture livre : couverture arrive depuis la droite */
+@keyframes book-close { from{transform:rotateY(50deg) scaleX(0.7);opacity:0.35} to{transform:rotateY(0) scaleX(1);opacity:1} }
+
+.flip-out-next { animation: flip-out-next 0.22s ease-in  forwards; }
+.flip-in-next  { animation: flip-in-next  0.3s  ease-out 0.18s both; }
+.flip-out-prev { animation: flip-out-prev 0.22s ease-in  forwards; }
+.flip-in-prev  { animation: flip-in-prev  0.3s  ease-out 0.18s both; }
+.book-open     { animation: book-open  0.55s cubic-bezier(0.25,0.46,0.45,0.94) forwards; transform-origin: left center; }
+.book-close    { animation: book-close 0.55s cubic-bezier(0.25,0.46,0.45,0.94) forwards; transform-origin: right center; }

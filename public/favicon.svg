@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="goldFav" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#9b6e18"/>
+      <stop offset="45%"  stop-color="#e0b554"/>
+      <stop offset="100%" stop-color="#9b6e18"/>
+    </linearGradient>
+    <linearGradient id="goldVFav" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#f0cc68"/>
+      <stop offset="100%" stop-color="#9b6e18"/>
+    </linearGradient>
+    <filter id="glowFav">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="64" height="64" rx="12" fill="#140900"/>
+  <rect width="62" height="62" x="1" y="1" rx="11" fill="none" stroke="rgba(201,146,42,0.25)" stroke-width="1"/>
+
+  <path d="M8 18 C8 14 11 13 14 13 L29 13 C30.5 13 31 14 31 15 L31 50 C31 51 30.5 52 29 52 L13 52 C10 52 8 50 8 47 Z"
+        fill="#1e1206" stroke="url(#goldFav)" stroke-width="1.2"/>
+  <path d="M33 15 C33 14 33.5 13 35 13 L50 13 C53 13 56 14 56 18 L56 47 C56 50 54 52 51 52 L35 52 C33.5 52 33 51 33 50 Z"
+        fill="#1e1206" stroke="url(#goldFav)" stroke-width="1.2"/>
+  <line x1="32" y1="12" x2="32" y2="53" stroke="url(#goldVFav)" stroke-width="2" filter="url(#glowFav)"/>
+
+  <line x1="44.5" y1="19" x2="44.5" y2="35" stroke="url(#goldVFav)" stroke-width="2.8" stroke-linecap="round" filter="url(#glowFav)"/>
+  <line x1="37.5" y1="25" x2="51.5" y2="25" stroke="url(#goldVFav)" stroke-width="2.8" stroke-linecap="round" filter="url(#glowFav)"/>
+
+  <line x1="11.5" y1="23" x2="27.5" y2="23" stroke="#c9922a" stroke-width="1.2" stroke-linecap="round" opacity="0.55"/>
+  <line x1="11.5" y1="29" x2="27.5" y2="29" stroke="#c9922a" stroke-width="1.2" stroke-linecap="round" opacity="0.55"/>
+  <line x1="11.5" y1="35" x2="27.5" y2="35" stroke="#c9922a" stroke-width="1.2" stroke-linecap="round" opacity="0.55"/>
+  <line x1="11.5" y1="41" x2="22"   y2="41" stroke="#c9922a" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+
+  <text x="44.5" y="12" text-anchor="middle" font-size="7" fill="#e0b554" opacity="0.9" filter="url(#glowFav)">✦</text>
+</svg>

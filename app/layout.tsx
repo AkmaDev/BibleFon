@@ -19,10 +19,17 @@ export const metadata: Metadata = {
   description:
     "Des histoires bibliques illustrées, lues et écoutées en langue fon pour les enfants et les familles.",
   keywords: ["Bible", "Fon", "Bénin", "histoires pour enfants", "langue fon", "audio"],
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico" },
+    ],
+  },
   openGraph: {
     title: "BibleFon",
     description: "Histoires bibliques illustrées en langue fon",
     type: "website",
+    images: [{ url: "/logo.svg", width: 320, height: 80, alt: "BibleFon" }],
   },
 }
 

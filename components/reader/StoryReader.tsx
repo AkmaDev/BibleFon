@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useCallback, useEffect, useRef } from "react"
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import Link from "next/link"
 import {
@@ -10,8 +10,7 @@ import type { Book, PageContent } from "@/lib/books"
 
 /* ─────────────────────────────────────────────
    Turn.js CDN — même moteur que FlipHTML5
-   autoCenter:true → couverture seule = livre centré
-                    spread = livre pleine largeur
+   autoCenter:false → on gère le centrage manuellement
    Pas de classe "hard" sur les couvertures → toutes les pages fluides
 ───────────────────────────────────────────── */
 const CDN_JQUERY = "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
@@ -40,14 +39,16 @@ function turnJs(el: HTMLElement): any {
 
 function useAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [playing, setPlaying]  = useState(false)
-  const [loading, setLoading]  = useState(false)
-  const [error,   setError]    = useState<string | null>(null)
+  const [playing,      setPlaying]      = useState(false)
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+  const [currentSegIdx, setCurrentSegIdx] = useState<number | null>(null)
 
   const stop = useCallback(() => {
     audioRef.current?.pause()
     audioRef.current = null
     setPlaying(false)
+    setCurrentSegIdx(null)
   }, [])
 
   const speak = useCallback(async (text: string) => {
@@ -77,6 +78,25 @@ function useAudio() {
     }
   }, [stop])
 
+  const playFiles = useCallback((segments: { src: string }[]) => {
+    stop()
+    if (segments.length === 0) return
+    setError(null)
+    let idx = 0
+    const playNext = () => {
+      if (idx >= segments.length) { setPlaying(false); setCurrentSegIdx(null); return }
+      const segIdx = idx
+      setCurrentSegIdx(segIdx)
+      const a = new Audio(segments[idx++].src)
+      a.onended = playNext
+      a.onerror = () => { setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null) }
+      a.play()
+      audioRef.current = a
+      setPlaying(true)
+    }
+    playNext()
+  }, [stop])
+
   const toggle = useCallback(() => {
     if (!audioRef.current) return
     if (playing) { audioRef.current.pause(); setPlaying(false) }
@@ -84,7 +104,7 @@ function useAudio() {
   }, [playing])
 
   useEffect(() => () => stop(), [stop])
-  return { playing, loading, error, speak, toggle, stop }
+  return { playing, loading, error, currentSegIdx, speak, playFiles, toggle, stop }
 }
 
 /* ─────────────────────────────────────────────
@@ -122,6 +142,59 @@ function PaperGrain() {
 }
 
 /* ─────────────────────────────────────────────
+   Utilitaires de pagination du texte
+───────────────────────────────────────────── */
+
+const CHUNK_CHARS = 200  // max chars par sous-page (MobileTextBlock)
+
+function splitText(text: string): string[] {
+  if (!text || text.length <= CHUNK_CHARS) return [text]
+  const chunks: string[] = []
+  let remaining = text.trim()
+  while (remaining.length > CHUNK_CHARS) {
+    // Cherche une limite de phrase après au moins la moitié du chunk
+    const searchFrom = Math.floor(CHUNK_CHARS * 0.6)
+    const sub = remaining.slice(searchFrom)
+    const match = sub.search(/[.!?»]\s/)
+    let cutAt: number
+    if (match === -1) {
+      // Pas de limite de phrase — couper sur un espace
+      const wb = remaining.lastIndexOf(" ", CHUNK_CHARS)
+      cutAt = wb > 0 ? wb : CHUNK_CHARS
+    } else {
+      cutAt = searchFrom + match + 1
+    }
+    chunks.push(remaining.slice(0, cutAt).trim())
+    remaining = remaining.slice(cutAt).trim()
+  }
+  if (remaining) chunks.push(remaining)
+  return chunks.length > 1 ? chunks : [text]
+}
+
+function SubPageNav({
+  total, current, onPrev, onNext,
+}: { total: number; current: number; onPrev: () => void; onNext: () => void }) {
+  if (total <= 1) return null
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, zIndex: 4, flexShrink: 0 }}>
+      <button
+        onClick={onPrev} disabled={current === 0}
+        style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid rgba(160,100,30,0.35)", background: "rgba(160,100,30,0.10)", cursor: current === 0 ? "default" : "pointer", opacity: current === 0 ? 0.28 : 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontSize: 10, color: "#9b6e18" }}
+      >▲</button>
+      <div style={{ display: "flex", gap: 4 }}>
+        {Array.from({ length: total }, (_, i) => (
+          <div key={i} style={{ width: i === current ? 14 : 5, height: 5, borderRadius: 3, background: i === current ? "#c9922a" : "rgba(160,100,30,0.25)", transition: "all 0.2s" }} />
+        ))}
+      </div>
+      <button
+        onClick={onNext} disabled={current >= total - 1}
+        style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid rgba(160,100,30,0.35)", background: "rgba(160,100,30,0.10)", cursor: current >= total - 1 ? "default" : "pointer", opacity: current >= total - 1 ? 0.28 : 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, fontSize: 10, color: "#9b6e18" }}
+      >▼</button>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
    Contenu des pages individuelles
 ───────────────────────────────────────────── */
 
@@ -131,20 +204,28 @@ function CoverPageContent({ page }: { page: Extract<PageContent, { type: "title"
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={page.image} alt={page.title}
-        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }}
+        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
       />
+      {/* Bande blanche semi-transparente en bas */}
       <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        padding: "clamp(24px,10%,72px) clamp(18px,8%,56px)",
-        background: "linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.38) 55%, transparent 100%)",
+        position: "absolute", bottom: "8%", left: "6%", right: "6%",
+        padding: "clamp(10px,4%,24px) clamp(12px,5%,28px)",
+        background: "rgba(255,255,255,0.82)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        borderRadius: "clamp(6px,1.5vw,14px)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
         textAlign: "center",
       }}>
-        <p style={{ fontSize: "clamp(10px,2.8vw,17px)", color: "#e0b554", letterSpacing: "0.2em", textTransform: "uppercase", margin: "0 0 10px" }}>
-          {page.titleFon}
+        <p style={{ fontSize: "clamp(7px,1.8vw,11px)", color: "#9a6e1a", letterSpacing: "0.22em", textTransform: "uppercase", margin: "0 0 6px", opacity: 0.9 }}>
+          BibleFon
         </p>
-        <h1 style={{ fontSize: "clamp(20px,5.5vw,42px)", fontWeight: 700, color: "white", fontFamily: "var(--font-serif)", lineHeight: 1.2, margin: 0 }}>
+        <h1 style={{ fontSize: "clamp(14px,4vw,32px)", fontWeight: 700, color: "#1a1209", fontFamily: "var(--font-serif)", lineHeight: 1.2, margin: "0 0 5px" }}>
           {page.title}
         </h1>
+        <p style={{ fontSize: "clamp(7px,1.6vw,11px)", color: "#7a5614", letterSpacing: "0.12em", margin: 0, opacity: 0.85 }}>
+          {page.titleFon}
+        </p>
       </div>
     </div>
   )
@@ -201,11 +282,11 @@ function MetaRightContent({ page }: { page: Extract<PageContent, { type: "meta" 
   )
 }
 
-function ImagePageContent({ src, caption }: { src: string; caption?: string }) {
+function ImagePageContent({ src, caption, position = "center" }: { src: string; caption?: string; position?: string }) {
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={caption ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+      <img src={src} alt={caption ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: position, display: "block" }} />
       {caption && (
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "28px 14px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.48), transparent)" }}>
           <p style={{ fontSize: "clamp(9px,1.6vw,12px)", color: "rgba(255,255,255,0.72)", textAlign: "center", fontStyle: "italic", margin: 0 }}>{caption}</p>
@@ -233,29 +314,103 @@ function DecorativePageContent({ heading }: { heading?: string }) {
   )
 }
 
-function TextPageContent({ body, pageNum, heading }: { body: string; pageNum: number; heading?: string }) {
+function TextPageContent({
+  body, pageNum, heading,
+  lang = "fr",
+  fonText,
+  fonSegments,
+  activeSegIdx,
+}: {
+  body: string; pageNum: number; heading?: string
+  lang?: "fr" | "fon"
+  fonText?: string
+  fonSegments?: { src: string; fonText: string }[]
+  activeSegIdx?: number | null
+}) {
+  const showFon = lang === "fon"
+
+  const PAD_H = "clamp(14px,4%,28px)"
+  const PAD_V = "clamp(14px,4.5%,30px)"
+
+  const headingEl = heading ? (
+    <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(8px,1.6vw,11px)", fontWeight: 700, color: "#7a4c18", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px 0", lineHeight: 1.4, zIndex: 4, flexShrink: 0 }}>
+      {heading}
+    </p>
+  ) : null
+
+  /* Mode Fon avec segments (karaoke) — tous les segments visibles, highlight sur l'actif */
+  if (showFon && fonSegments && fonSegments.length > 0) {
+    return (
+      <div style={{
+        width: "100%", height: "100%", background: PAPER_BG,
+        display: "flex", flexDirection: "column",
+        padding: `${PAD_V} ${PAD_H}`, overflow: "hidden", position: "relative",
+      }}>
+        <PaperGrain />
+        {headingEl}
+        <div style={{ display: "flex", flexDirection: "column", gap: "clamp(6px,1.2%,10px)", zIndex: 4 }}>
+          {fonSegments.map((seg, idx) =>
+            seg.fonText ? (
+              <p key={idx} style={{
+                fontFamily: "var(--font-serif)", fontSize: "clamp(11px,1.75vw,13px)", lineHeight: 2.05,
+                color: "#2a1505", margin: 0,
+                padding: "4px 8px 4px 10px", borderRadius: 4,
+                background: idx === activeSegIdx ? "rgba(201,146,42,0.28)" : "transparent",
+                borderLeft: idx === activeSegIdx ? "3px solid #c9922a" : "3px solid transparent",
+                transition: "background 0.35s, border-color 0.35s",
+              }}>
+                {seg.fonText}
+              </p>
+            ) : null
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  /* Mode Fon sans segments (fonText simple) */
+  if (showFon && fonText) {
+    return (
+      <div style={{
+        width: "100%", height: "100%", background: PAPER_BG,
+        display: "flex", flexDirection: "column",
+        padding: `${PAD_V} ${PAD_H}`, overflow: "hidden", position: "relative",
+      }}>
+        <PaperGrain />
+        {headingEl}
+        <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(11px,1.8vw,13.5px)", lineHeight: 2.05, color: "#2a1505", margin: 0, zIndex: 4 }}>
+          {fonText}
+        </p>
+      </div>
+    )
+  }
+
+  /* Mode Français (défaut) — texte complet, drop cap si court */
+  const isShort = body.length <= 160
   const first = body[0]
   const rest  = body.slice(1)
+
   return (
     <div style={{
       width: "100%", height: "100%", background: PAPER_BG,
-      display: "flex", flexDirection: "column", justifyContent: "center",
-      padding: "clamp(24px,8%,56px) clamp(20px,7%,48px)", overflow: "hidden", position: "relative",
+      display: "flex", flexDirection: "column",
+      padding: `${PAD_V} ${PAD_H}`, overflow: "hidden", position: "relative",
     }}>
       <PaperGrain />
-      {heading && (
-        <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(9px,1.8vw,13px)", fontWeight: 700, color: "#7a4c18", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px 0", lineHeight: 1.4, zIndex: 4 }}>
-          {heading}
+      {headingEl}
+      {isShort ? (
+        <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(12px,2vw,15px)", lineHeight: 1.95, color: "#2a1505", margin: 0, zIndex: 4 }}>
+          <span style={{ float: "left", fontSize: "clamp(3rem,6.5vw,4.8rem)", fontWeight: 700, lineHeight: 0.78, marginRight: "0.06em", marginTop: "0.05em", color: "#1e1005", fontFamily: "var(--font-serif)" }}>
+            {first}
+          </span>
+          {rest}
+          <span style={{ clear: "both", display: "table" }} />
+        </p>
+      ) : (
+        <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(11px,1.8vw,13.5px)", lineHeight: 2.0, color: "#2a1505", margin: 0, zIndex: 4 }}>
+          {body}
         </p>
       )}
-      <p style={{ fontFamily: "var(--font-serif)", fontSize: "clamp(12px,2vw,15px)", lineHeight: 1.95, color: "#2a1505", margin: 0, zIndex: 4 }}>
-        <span style={{ float: "left", fontSize: "clamp(3rem,6.5vw,4.8rem)", fontWeight: 700, lineHeight: 0.78, marginRight: "0.06em", marginTop: "0.05em", color: "#1e1005", fontFamily: "var(--font-serif)" }}>
-          {first}
-        </span>
-        {rest}
-        <span style={{ clear: "both", display: "table" }} />
-      </p>
-      <p style={{ fontSize: 9, color: "#b09060", textAlign: "right", marginTop: 14, zIndex: 4 }}>{pageNum}</p>
     </div>
   )
 }
@@ -341,7 +496,12 @@ type FlatEntry = {
   allPagesIdx: number
 }
 
-function buildFlatPages(allPages: AnyPage[], book: Book): FlatEntry[] {
+function buildFlatPages(
+  allPages: AnyPage[], book: Book,
+  lang: "fr" | "fon" = "fr",
+  hlPageIdx: number | null = null,
+  hlSegIdx: number | null = null,
+): FlatEntry[] {
   const entries: FlatEntry[] = []
   let pageNum = 1
 
@@ -359,18 +519,31 @@ function buildFlatPages(allPages: AnyPage[], book: Book): FlatEntry[] {
       entries.push({ content: <MetaRightContent page={page} />, allPagesIdx: i })
 
     } else if (page.type === "mixed") {
-      entries.push({ content: <ImagePageContent src={page.image} caption={page.caption} />, allPagesIdx: i })
-      entries.push({ content: <TextPageContent  body={page.body} pageNum={pageNum++} />, allPagesIdx: i })
+      entries.push({ content: <ImagePageContent src={page.image} caption={page.caption} position={page.imgPosition} />, allPagesIdx: i })
+      entries.push({
+        content: <TextPageContent
+          body={page.body} pageNum={pageNum++}
+          lang={lang} fonText={page.fonText}
+          fonSegments={page.audioFiles}
+          activeSegIdx={hlPageIdx === i ? hlSegIdx : null}
+        />,
+        allPagesIdx: i,
+      })
 
     } else if (page.type === "text") {
       entries.push({
         content: page.image
-          ? <ImagePageContent src={page.image} />
-          : <DecorativePageContent heading={page.heading} />,
+          ? <ImagePageContent src={page.image} position={page.imgPosition} />
+          : <div style={{ width: "100%", height: "100%", background: PAPER_BG, position: "relative" }}><PaperGrain /></div>,
         allPagesIdx: i,
       })
       entries.push({
-        content: <TextPageContent body={page.body} pageNum={pageNum++} heading={page.image ? page.heading : undefined} />,
+        content: <TextPageContent
+          body={page.body} pageNum={pageNum++} heading={page.image ? page.heading : undefined}
+          lang={lang} fonText={page.fonText}
+          fonSegments={page.audioFiles}
+          activeSegIdx={hlPageIdx === i ? hlSegIdx : null}
+        />,
         allPagesIdx: i,
       })
 
@@ -388,15 +561,271 @@ function buildFlatPages(allPages: AnyPage[], book: Book): FlatEntry[] {
 }
 
 /* ─────────────────────────────────────────────
+   Mobile detection
+───────────────────────────────────────────── */
+
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener("resize", check)
+    return () => window.removeEventListener("resize", check)
+  }, [])
+  return mobile
+}
+
+/* ─────────────────────────────────────────────
+   MobileTextBlock — texte paginé dans une carte mobile
+───────────────────────────────────────────── */
+
+function MobileTextBlock({ text, audioEl }: { text: string; audioEl?: React.ReactNode }) {
+  const chunks = useMemo(() => splitText(text), [text])
+  const [idx, setIdx] = useState(0)
+  const hasNav = chunks.length > 1
+  return (
+    <div>
+      <p style={{ fontFamily: "var(--font-serif)", fontSize: 15, color: "#2a1a08", lineHeight: 1.85, margin: 0 }}>
+        {chunks[idx]}
+      </p>
+      {(hasNav || audioEl) && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: hasNav ? "space-between" : "flex-start", marginTop: 8, gap: 8 }}>
+          {hasNav ? (
+            <SubPageNav
+              total={chunks.length} current={idx}
+              onPrev={() => setIdx(i => Math.max(0, i - 1))}
+              onNext={() => setIdx(i => Math.min(chunks.length - 1, i + 1))}
+            />
+          ) : <div />}
+          {audioEl}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   MobileCard — une page du livre en mode mobile
+───────────────────────────────────────────── */
+
+function MobileCard({
+  page, book, lang, audio,
+}: {
+  page: AnyPage; book: Book; lang: "fr" | "fon"; audio: ReturnType<typeof useAudio>
+}) {
+  const PAD = "20px"
+  const CARD_RADIUS = "12px"
+  const cardBase: React.CSSProperties = { borderRadius: CARD_RADIUS, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }
+
+  if (page.type === "back-cover") {
+    return (
+      <div style={{ ...cardBase, background: "linear-gradient(175deg, #180c04 0%, #0c0602 100%)", padding: PAD, display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
+        <div style={{ fontSize: 28, color: "rgba(201,146,42,0.25)", fontFamily: "var(--font-serif)" }}>✦</div>
+        <p style={{ fontFamily: "var(--font-serif)", fontSize: 22, color: "#e0b554", fontWeight: 700, margin: 0, lineHeight: 1.3 }}>{book.title}</p>
+        <p style={{ fontSize: 13, color: "#6a4a28", lineHeight: 1.8, margin: 0 }}>{book.description}</p>
+        <div style={{ width: 40, height: 1, background: "rgba(201,146,42,0.2)" }} />
+        <Link href="/" style={{ fontSize: 12, color: "#9b6e18", textDecoration: "none", border: "1px solid rgba(160,100,30,0.3)", padding: "8px 20px", borderRadius: 20 }}>
+          ← Bibliothèque
+        </Link>
+      </div>
+    )
+  }
+
+  if (page.type === "title") {
+    return (
+      <div style={{ ...cardBase, position: "relative", aspectRatio: "2/3" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={page.image} alt={page.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        <div style={{ position: "absolute", bottom: "5%", left: "6%", right: "6%", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+          <p style={{ fontSize: 10, color: "#9a6e1a", letterSpacing: "0.2em", textTransform: "uppercase", margin: "0 0 5px" }}>BibleFon</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1209", fontFamily: "var(--font-serif)", lineHeight: 1.2, margin: "0 0 4px" }}>{page.title}</h1>
+          <p style={{ fontSize: 11, color: "#7a5614", letterSpacing: "0.1em", margin: 0 }}>{page.titleFon}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (page.type === "meta") {
+    return (
+      <div style={{ ...cardBase, background: PAPER_BG, padding: PAD, position: "relative" }}>
+        <PaperGrain />
+        <div style={{ position: "relative", zIndex: 4, display: "flex", flexDirection: "column", gap: 12 }}>
+          <p style={{ fontSize: 10, color: "#9b6e18", letterSpacing: "0.2em", textTransform: "uppercase", margin: 0 }}>{page.reference}</p>
+          <div style={{ width: 28, height: 1, background: "rgba(160,100,30,0.35)" }} />
+          <p style={{ fontFamily: "var(--font-serif)", fontSize: 14, color: "#3a2010", lineHeight: 1.85, margin: 0 }}>
+            {page.intro ?? "Suis l'histoire page après page, avec audio en langue Fon."}
+          </p>
+          <p style={{ fontSize: 11, color: "#7a5a28", margin: 0, fontStyle: "italic" }}>{page.note}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (page.type === "mixed") {
+    const audioFiles = page.audioFiles
+    const hasAudio = !!(audioFiles?.length || page.fonText)
+    const text = lang === "fon" ? (page.fonText ?? page.body) : page.body
+    return (
+      <div style={{ ...cardBase, background: PAPER_BG, position: "relative" }}>
+        <PaperGrain />
+        {/* Image */}
+        <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", overflow: "hidden" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={page.image} alt={page.caption} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: page.imgPosition ?? "center", display: "block" }} />
+          {page.caption && (
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 14px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.55), transparent)" }}>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", textAlign: "center", fontStyle: "italic", margin: 0 }}>{page.caption}</p>
+            </div>
+          )}
+        </div>
+        {/* Text */}
+        <div style={{ padding: PAD, position: "relative", zIndex: 4 }}>
+          <MobileTextBlock
+            text={text}
+            audioEl={hasAudio ? (
+              <button
+                onClick={() => {
+                  if (audio.playing) { audio.toggle(); return }
+                  if (audioFiles?.length) { audio.playFiles(audioFiles); return }
+                  if (page.fonText) audio.speak(page.fonText)
+                }}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 20, border: "1px solid rgba(201,146,42,0.4)", background: audio.playing ? "rgba(201,146,42,0.18)" : "rgba(201,146,42,0.08)", color: "#9b6e18", fontSize: 11, cursor: "pointer" }}
+              >
+                {audio.playing ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                <span>{audio.playing ? "Pause" : "Fon"}</span>
+              </button>
+            ) : undefined}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (page.type === "text") {
+    const audioFiles = page.audioFiles
+    const hasAudio = !!(audioFiles?.length || page.fonText)
+    const text = lang === "fon" ? (page.fonText ?? page.body) : page.body
+    return (
+      <div style={{ ...cardBase, background: PAPER_BG, position: "relative" }}>
+        <PaperGrain />
+        {/* Image en haut si disponible */}
+        {page.image && (
+          <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", overflow: "hidden" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={page.image} alt={page.heading ?? ""} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: page.imgPosition ?? "center", display: "block" }} />
+          </div>
+        )}
+        <div style={{ padding: PAD, position: "relative", zIndex: 4, display: "flex", flexDirection: "column", gap: 10 }}>
+          {page.heading && (
+            <p style={{ fontFamily: "var(--font-serif)", fontSize: 12, fontWeight: 700, color: "#7a4c18", textTransform: "uppercase", letterSpacing: "0.12em", margin: 0 }}>{page.heading}</p>
+          )}
+          <MobileTextBlock
+            text={text}
+            audioEl={hasAudio ? (
+              <button
+                onClick={() => {
+                  if (audio.playing) { audio.toggle(); return }
+                  if (audioFiles?.length) { audio.playFiles(audioFiles); return }
+                  if (page.fonText) audio.speak(page.fonText)
+                }}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 20, border: "1px solid rgba(201,146,42,0.4)", background: audio.playing ? "rgba(201,146,42,0.18)" : "rgba(201,146,42,0.08)", color: "#9b6e18", fontSize: 11, cursor: "pointer" }}
+              >
+                {audio.playing ? <VolumeX size={12} /> : <Volume2 size={12} />}
+                <span>{audio.playing ? "Pause" : "Fon"}</span>
+              </button>
+            ) : undefined}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (page.type === "quote") {
+    const text = lang === "fon" ? (page.fonText ?? page.verse) : page.verse
+    return (
+      <div style={{ ...cardBase, background: PAPER_BG_ALT, padding: "32px 24px", position: "relative", textAlign: "center" }}>
+        <PaperGrain />
+        <div style={{ position: "relative", zIndex: 4, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <div style={{ fontSize: 48, color: "rgba(160,100,30,0.14)", fontFamily: "var(--font-serif)", lineHeight: 1 }}>&ldquo;</div>
+          <blockquote style={{ fontFamily: "var(--font-serif)", fontSize: 16, fontStyle: "italic", color: "#3a2010", lineHeight: 1.85, margin: 0 }}>{text}</blockquote>
+          <div style={{ width: 28, height: 1, background: "rgba(160,100,30,0.35)" }} />
+          {page.reference && (
+            <p style={{ fontSize: 13, fontWeight: 600, color: "#9b6e18", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>{page.reference}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
+/* ─────────────────────────────────────────────
+   MobileReader — lecteur vertical pour mobile
+───────────────────────────────────────────── */
+
+function MobileReader({ book }: { book: Book }) {
+  const audio = useAudio()
+  const [lang, setLang] = useState<"fr" | "fon">("fr")
+  const allPages = [...book.pages, { type: "back-cover" as const }] as AnyPage[]
+
+  return (
+    <div className="reader-bg" style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+      {/* Toolbar sticky */}
+      <header style={{
+        position: "sticky", top: 0, zIndex: 10,
+        background: "rgba(20,13,6,0.94)", backdropFilter: "blur(10px)",
+        borderBottom: "1px solid rgba(201,146,42,0.15)",
+        padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0,
+      }}>
+        <Link
+          href="/"
+          style={{ display: "flex", alignItems: "center", color: "rgba(255,255,255,0.45)", textDecoration: "none" }}
+        >
+          <ArrowLeft size={18} />
+        </Link>
+        <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)" }} />
+        <p style={{ flex: 1, margin: 0, fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.85)", fontFamily: "var(--font-serif)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {book.title}
+        </p>
+        {/* Toggle FR/FON */}
+        <button
+          onClick={() => setLang(l => l === "fr" ? "fon" : "fr")}
+          style={{
+            display: "flex", alignItems: "center", gap: 0,
+            borderRadius: 20, overflow: "hidden",
+            border: "1px solid rgba(255,255,255,0.15)",
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+            cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          <span style={{ padding: "5px 10px", background: lang === "fr" ? "rgba(201,146,42,0.85)" : "rgba(255,255,255,0.06)", color: lang === "fr" ? "#1a0e00" : "rgba(255,255,255,0.35)", transition: "all 0.2s" }}>FR</span>
+          <span style={{ padding: "5px 10px", background: lang === "fon" ? "rgba(201,146,42,0.85)" : "rgba(255,255,255,0.06)", color: lang === "fon" ? "#1a0e00" : "rgba(255,255,255,0.35)", transition: "all 0.2s" }}>FON</span>
+        </button>
+      </header>
+
+      {/* Pages empilées */}
+      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 20, maxWidth: 520, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        {allPages.map((page, i) => (
+          <MobileCard key={i} page={page} book={book} lang={lang} audio={audio} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
    Main StoryReader
 ───────────────────────────────────────────── */
 
 export function StoryReader({ book }: { book: Book }) {
+  const isMobile = useIsMobile()
 
   /* ── State ── */
   const [turnPage,    setTurnPage]    = useState(1)   // page Turn.js (1-indexed)
   const [settledPage, setSettledPage] = useState(1)   // page après fin d'animation (pour le shift)
   const [spreadSize,  setSpreadSize]  = useState({ w: 0, h: 0 })
+  const [lang,        setLang]        = useState<"fr" | "fon">("fr")
   const [bookReady,   setBookReady]   = useState(false) // true après init Turn.js (évite le flash)
 
   /* ── Refs ── */
@@ -418,6 +847,18 @@ export function StoryReader({ book }: { book: Book }) {
     currentPage && "fonText" in currentPage
       ? (currentPage as { fonText?: string }).fonText ?? null
       : null
+  const currentAudioFiles =
+    currentPage && "audioFiles" in currentPage
+      ? (currentPage as { audioFiles?: { src: string; fonText: string }[] }).audioFiles ?? null
+      : null
+
+  /* ── Re-render des pages Turn.js quand lang ou segment actif change ── */
+  useEffect(() => {
+    if (!initDone.current || rootsRef.current.length === 0) return
+    const entries = buildFlatPages(allPages, book, lang, currentAllPagesIdx, audio.currentSegIdx)
+    entries.forEach((entry, i) => { rootsRef.current[i]?.render(entry.content) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang, audio.currentSegIdx, currentAllPagesIdx])
 
   /* ── Calcul des dimensions (ResizeObserver) ── */
   useEffect(() => {
@@ -485,11 +926,7 @@ export function StoryReader({ book }: { book: Book }) {
         fb.style.width  = `${bookW}px`
         fb.style.height = `${pageH}px`
 
-        /* Initialiser Turn.js
-           autoCenter:true = le livre se centre automatiquement :
-             - couverture seule → livre centré (se décale dès qu'on tourne)
-             - spread            → livre occupe toute la largeur bookW
-           Comportement natif FlipHTML5 */
+        /* Initialiser Turn.js */
         turnJs(fb).turn({
           width:        bookW,
           height:       pageH,
@@ -556,25 +993,27 @@ export function StoryReader({ book }: { book: Book }) {
     return () => window.removeEventListener("keydown", handler)
   }, [goNext, goPrev])
 
-  /* ── TTS ── */
+  /* ── Audio : fichiers pré-enregistrés ou TTS ── */
+  const hasAudio = !!(currentAudioFiles?.length || currentFon)
   const handleSpeak = () => {
-    if (!currentFon) return
     if (audio.playing) { audio.toggle(); return }
-    audio.speak(currentFon)
+    if (currentAudioFiles?.length) { audio.playFiles(currentAudioFiles); return }
+    if (currentFon) audio.speak(currentFon)
   }
+  const toggleLang = () => setLang(l => l === "fr" ? "fon" : "fr")
 
   /* ── États des boutons ── */
   const atFirst = turnPage <= 1
   const atLast  = turnPage >= totalFlat
 
   /* Shift basé sur settledPage (après fin d'animation) :
-     la couverture et la 4e se centrent APRÈS le pliage — pas pendant.
-     Le fond sombre du flipbook (fb.style.background) évite le "détachement"
-     en remplissant la moitié vide d'une couleur livre-intérieur. */
+     la couverture et la 4e se centrent APRÈS le pliage — pas pendant. */
   const pageW      = spreadSize.w > 0 ? Math.round(spreadSize.w / 2) : 0
-  const bookShiftX = settledPage === 1            ? -(pageW / 2)
-                   : settledPage >= totalFlat     ?  (pageW / 2)
-                   :                                 0
+  const bookShiftX = settledPage === 1        ? -(pageW / 2)
+                   : settledPage >= totalFlat ?  (pageW / 2)
+                   :                             0
+
+  if (isMobile) return <MobileReader book={book} />
 
   return (
     <div
@@ -610,6 +1049,22 @@ export function StoryReader({ book }: { book: Book }) {
           </p>
         </div>
 
+        {/* Toggle langue FR / FON */}
+        <button
+          onClick={toggleLang}
+          title={lang === "fr" ? "Voir en Fon" : "Voir en Français"}
+          style={{
+            display: "flex", alignItems: "center", gap: 0,
+            borderRadius: 20, overflow: "hidden",
+            border: "1px solid rgba(255,255,255,0.15)",
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ padding: "5px 10px", background: lang === "fr" ? "rgba(201,146,42,0.85)" : "rgba(255,255,255,0.06)", color: lang === "fr" ? "#1a0e00" : "rgba(255,255,255,0.35)", transition: "all 0.2s" }}>FR</span>
+          <span style={{ padding: "5px 10px", background: lang === "fon" ? "rgba(201,146,42,0.85)" : "rgba(255,255,255,0.06)", color: lang === "fon" ? "#1a0e00" : "rgba(255,255,255,0.35)", transition: "all 0.2s" }}>FON</span>
+        </button>
+
         {audio.error && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 20, background: "rgba(220,50,50,0.15)", border: "1px solid rgba(220,50,50,0.3)" }}>
             <AlertCircle size={12} color="#f87171" />
@@ -619,16 +1074,16 @@ export function StoryReader({ book }: { book: Book }) {
 
         <button
           onClick={handleSpeak}
-          disabled={!currentFon || audio.loading}
+          disabled={!hasAudio || audio.loading}
           title={audio.playing ? "Pause" : "Écouter en Fon"}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "6px 14px", borderRadius: 20,
-            border: `1px solid ${currentFon ? "rgba(201,146,42,0.4)" : "rgba(255,255,255,0.1)"}`,
-            background: currentFon && audio.playing ? "rgba(201,146,42,0.22)" : "rgba(255,255,255,0.06)",
-            color: currentFon ? "#e0b554" : "rgba(255,255,255,0.25)",
+            border: `1px solid ${hasAudio ? "rgba(201,146,42,0.4)" : "rgba(255,255,255,0.1)"}`,
+            background: hasAudio && audio.playing ? "rgba(201,146,42,0.22)" : "rgba(255,255,255,0.06)",
+            color: hasAudio ? "#e0b554" : "rgba(255,255,255,0.25)",
             fontSize: 11, fontWeight: 500,
-            cursor: currentFon ? "pointer" : "not-allowed",
+            cursor: hasAudio ? "pointer" : "not-allowed",
             opacity: audio.loading ? 0.7 : 1, transition: "all 0.2s",
           }}
         >
@@ -641,7 +1096,7 @@ export function StoryReader({ book }: { book: Book }) {
 
       {/* ── Book stage ──
           IMPORTANT : pas de overflow:hidden sur le container direct de Turn.js
-          (ça couperait l'animation de pliage) */}
+          (ça couperait l'animation de pliage au-delà du div) */}
       <div
         ref={stageRef}
         style={{
@@ -673,8 +1128,6 @@ export function StoryReader({ book }: { book: Book }) {
 
         {/* ── Turn.js container ──
             Le wrapper gère le shift couverture/4e de couverture.
-            Le fond sombre du flipbook remplit la moitié vide (intérieur livre)
-            pour éviter l'effet "page qui se décolle".
             opacity:0 jusqu'à bookReady → évite le flash au chargement. */}
         <div style={{
           transform:  `translateX(${bookShiftX}px)`,

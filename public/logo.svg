@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#9b6e18"/>
+      <stop offset="50%"  stop-color="#e0b554"/>
+      <stop offset="100%" stop-color="#9b6e18"/>
+    </linearGradient>
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#c9922a"/>
+      <stop offset="100%" stop-color="#e0b554"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Open book icon -->
+  <!-- Left page -->
+  <path d="M10 22 Q10 18 14 17 L36 15 Q38 15 38 17 L38 60 Q38 62 36 62 L14 60 Q10 60 10 56 Z"
+        fill="#2a1a08" stroke="url(#goldGrad)" stroke-width="1.2"/>
+  <!-- Left page lines -->
+  <line x1="14" y1="25" x2="34" y2="24" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="14" y1="31" x2="34" y2="30" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="14" y1="37" x2="34" y2="36" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="14" y1="43" x2="34" y2="42" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="14" y1="49" x2="34" y2="48" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+
+  <!-- Right page -->
+  <path d="M42 17 Q42 15 44 15 L66 17 Q70 18 70 22 L70 56 Q70 60 66 60 L44 62 Q42 62 42 60 Z"
+        fill="#2a1a08" stroke="url(#goldGrad)" stroke-width="1.2"/>
+  <!-- Right page lines -->
+  <line x1="46" y1="24" x2="66" y2="25" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="46" y1="30" x2="66" y2="31" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="46" y1="36" x2="66" y2="37" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="46" y1="42" x2="66" y2="43" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+  <line x1="46" y1="48" x2="66" y2="49" stroke="#c9922a" stroke-width="0.7" opacity="0.5"/>
+
+  <!-- Spine / center binding -->
+  <line x1="40" y1="15" x2="40" y2="62" stroke="url(#goldGrad)" stroke-width="2" filter="url(#glow)"/>
+
+  <!-- Small cross on right page -->
+  <line x1="56" y1="19" x2="56" y2="27" stroke="#e0b554" stroke-width="1.5" opacity="0.8"/>
+  <line x1="52" y1="22" x2="60" y2="22" stroke="#e0b554" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- Decorative sparkle above binding -->
+  <text x="40" y="13" text-anchor="middle" font-size="6" fill="#e0b554" opacity="0.9">✦</text>
+
+  <!-- BibleFon text -->
+  <text x="88" y="46"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="30"
+        font-weight="700"
+        letter-spacing="1"
+        fill="url(#goldGrad)"
+        filter="url(#glow)">BibleFon</text>
+
+  <!-- Subtitle -->
+  <text x="89" y="62"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="9.5"
+        letter-spacing="2.5"
+        fill="#c9922a"
+        opacity="0.75">HISTOIRES EN LANGUE FON</text>
+
+  <!-- Bottom decorative line -->
+  <line x1="88" y1="66" x2="310" y2="66" stroke="url(#goldGrad)" stroke-width="0.6" opacity="0.4"/>
+</svg>
