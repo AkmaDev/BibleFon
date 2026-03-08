@@ -1,5 +1,6 @@
 import { Github, Mail, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -145,27 +146,29 @@ export default function AboutPage() {
           <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
             Qui
           </h2>
-          <div className="space-y-4 text-base leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-            <p>
-              Je m'appelle{" "}
-              <span style={{ color: "var(--foreground)" }}>Manassé A. AKPOVI</span>.
-              Je suis béninois. J'ai fait ma licence en génie logiciel à l'IFRI,
-              à Cotonou. Puis je suis venu en France, à l'ESGI Paris, pour un bachelor en ingénierie web.
-            </p>
-            <p>
-              BibleFon a démarré lors du hackathon du SENIA, dont le thème était
-              «&nbsp;l'IA multimodale au service de nos langues locales&nbsp;». Pour la première fois,
-              je ne codais pas pour coder — je travaillais sur quelque chose qui avait du sens
-              pour des millions de personnes.
-            </p>
-            <p>
-              Le projet a été développé en collaboration avec{" "}
-              <span style={{ color: "var(--foreground)" }}>Claude Code</span>,
-              un assistant de programmation par IA d'Anthropic. La vision, les choix, le sens :
-              c'est moi. L'exécution technique : Claude Code. Diriger un outil IA vers un objectif
-              précis en gardant le sens du projet est lui-même une compétence —
-              peut-être l'une des plus importantes du numérique à venir.
-            </p>
+          <div className="flex gap-6 items-start">
+            <Image
+              src="/manasse.jpg"
+              alt="Manassé A. AKPOVI"
+              width={88}
+              height={88}
+              className="rounded-full shrink-0 object-cover"
+              style={{ border: "2px solid var(--border)" }}
+            />
+            <div className="space-y-4 text-base leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+              <p>
+                Je m'appelle{" "}
+                <span style={{ color: "var(--foreground)" }}>Manassé A. AKPOVI</span>.
+                Je suis béninois. J'ai fait ma licence en génie logiciel à l'IFRI,
+                à Cotonou. Puis je suis venu en France, à l'ESGI Paris, pour un bachelor en ingénierie web.
+              </p>
+              <p>
+                BibleFon a démarré lors du hackathon du SENIA, dont le thème était
+                «&nbsp;l'IA multimodale au service de nos langues locales&nbsp;». Pour la première fois,
+                je ne codais pas pour coder — je travaillais sur quelque chose qui avait du sens
+                pour des millions de personnes.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -176,47 +179,12 @@ export default function AboutPage() {
           <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
             Ce que je cherche
           </h2>
-          <div className="space-y-3 text-base leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-            {[
-              {
-                title: "Des retours sur le contenu",
-                desc: "Locuteurs fon, linguistes, familles béninoises — si quelque chose sonne faux, je veux le savoir.",
-              },
-              {
-                title: "Des partenaires pour distribuer",
-                desc: "Écoles, associations, organisations bibliques, ONG éducatives travaillant en Afrique de l'Ouest.",
-              },
-              {
-                title: "Des collaborateurs pour la suite",
-                desc: "Traducteurs, illustrateurs, développeurs intéressés par les langues africaines et le numérique inclusif.",
-              },
-              {
-                title: "Des histoires à raconter",
-                desc: "Contes, récits civiques, contenus éducatifs — le pipeline peut s'étendre au-delà du biblique.",
-              },
-            ].map(({ title, desc }) => (
-              <div
-                key={title}
-                className="flex gap-4 p-4 rounded-xl"
-                style={{ background: "var(--card)", border: "1px solid var(--border)" }}
-              >
-                <span
-                  className="mt-0.5 text-base shrink-0"
-                  style={{ color: "var(--gold)" }}
-                >
-                  →
-                </span>
-                <div>
-                  <p className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-                    {title}
-                  </p>
-                  <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                    {desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-base leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+            Des retours de locuteurs fon — si quelque chose sonne faux, je veux le savoir.
+            Des partenaires pour distribuer : écoles, associations, organisations travaillant en Afrique de l'Ouest.
+            Des collaborateurs pour la suite : traducteurs, développeurs, toute personne qui croit que le numérique
+            peut parler à plus de monde qu'il ne le fait aujourd'hui.
+          </p>
         </section>
 
         <Divider />
