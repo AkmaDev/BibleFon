@@ -46,12 +46,14 @@ function turnJs(el: HTMLElement): any {
 function useAudio() {
   const audioRef   = useRef<HTMLAudioElement | null>(null)
   const blobUrlRef = useRef<string | null>(null)
+  const genRef     = useRef(0)   // compteur de génération — annule les callbacks en cours
   const [playing,       setPlaying]      = useState(false)
   const [loading,       setLoading]      = useState(false)
   const [error,         setError]        = useState<string | null>(null)
   const [currentSegIdx, setCurrentSegIdx] = useState<number | null>(null)
 
   const stop = useCallback(() => {
+    genRef.current += 1           // invalide tous les playNext / speak en cours
     if (audioRef.current) {
       audioRef.current.onended = null
       audioRef.current.onerror = null
@@ -70,6 +72,7 @@ function useAudio() {
 
   const speak = useCallback(async (text: string) => {
     stop()
+    const gen = genRef.current
     setLoading(true)
     setError(null)
     try {
@@ -78,32 +81,35 @@ function useAudio() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       })
+      if (genRef.current !== gen) return   // stop() appelé pendant le fetch
       if (!res.ok) {
         const e = await res.json().catch(() => ({}))
         throw new Error((e as { error?: string }).error ?? "Erreur TTS")
       }
       const url = URL.createObjectURL(await res.blob())
+      if (genRef.current !== gen) { URL.revokeObjectURL(url); return }
       blobUrlRef.current = url
-      const a   = new Audio(url)
+      const a = new Audio(url)
       a.onended = () => setPlaying(false)
       audioRef.current = a
-      a.play().then(() => setPlaying(true)).catch(() => {
-        setError("Audio indisponible")
-        audioRef.current = null
-      })
+      a.play()
+        .then(() => { if (genRef.current === gen) setPlaying(true) })
+        .catch(() => { setError("Audio indisponible"); audioRef.current = null })
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Audio indisponible")
+      if (genRef.current === gen) setError(e instanceof Error ? e.message : "Audio indisponible")
     } finally {
-      setLoading(false)
+      if (genRef.current === gen) setLoading(false)
     }
   }, [stop])
 
   const playFiles = useCallback((segments: { src: string }[]) => {
     stop()
     if (segments.length === 0) return
+    const gen = genRef.current
     setError(null)
     let idx = 0
     const playNext = () => {
+      if (genRef.current !== gen) return   // stop() appelé entre deux segments
       if (idx >= segments.length) { setPlaying(false); setCurrentSegIdx(null); return }
       const segIdx = idx
       setCurrentSegIdx(segIdx)
@@ -111,9 +117,9 @@ function useAudio() {
       a.onended = playNext
       a.onerror = () => { setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null) }
       audioRef.current = a
-      a.play().then(() => setPlaying(true)).catch(() => {
-        setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null)
-      })
+      a.play()
+        .then(() => { if (genRef.current === gen) setPlaying(true) })
+        .catch(() => { setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null) })
     }
     playNext()
   }, [stop])
