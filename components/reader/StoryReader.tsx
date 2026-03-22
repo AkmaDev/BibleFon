@@ -52,8 +52,14 @@ function useAudio() {
   const [currentSegIdx, setCurrentSegIdx] = useState<number | null>(null)
 
   const stop = useCallback(() => {
-    audioRef.current?.pause()
-    audioRef.current = null
+    if (audioRef.current) {
+      audioRef.current.onended = null
+      audioRef.current.onerror = null
+      audioRef.current.pause()
+      audioRef.current.src = ""   // libère l'audio sur Android Chrome
+      audioRef.current.load()     // iOS Safari exige load() pour vraiment arrêter
+      audioRef.current = null
+    }
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = null
@@ -80,9 +86,11 @@ function useAudio() {
       blobUrlRef.current = url
       const a   = new Audio(url)
       a.onended = () => setPlaying(false)
-      a.play()
       audioRef.current = a
-      setPlaying(true)
+      a.play().then(() => setPlaying(true)).catch(() => {
+        setError("Audio indisponible")
+        audioRef.current = null
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Audio indisponible")
     } finally {
@@ -102,21 +110,16 @@ function useAudio() {
       const a = new Audio(segments[idx++].src)
       a.onended = playNext
       a.onerror = () => { setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null) }
-      a.play()
       audioRef.current = a
-      setPlaying(true)
+      a.play().then(() => setPlaying(true)).catch(() => {
+        setError("Audio indisponible"); setPlaying(false); setCurrentSegIdx(null)
+      })
     }
     playNext()
   }, [stop])
 
-  const toggle = useCallback(() => {
-    if (!audioRef.current) return
-    if (playing) { audioRef.current.pause(); setPlaying(false) }
-    else          { audioRef.current.play();  setPlaying(true)  }
-  }, [playing])
-
   useEffect(() => () => stop(), [stop])
-  return { playing, loading, error, currentSegIdx, speak, playFiles, toggle, stop }
+  return { playing, loading, error, currentSegIdx, speak, playFiles, stop }
 }
 
 /* ─────────────────────────────────────────────
@@ -697,7 +700,7 @@ function MobileCard({
             audioEl={hasAudio ? (
               <button
                 onClick={() => {
-                  if (audio.playing) { audio.toggle(); return }
+                  if (audio.playing) { audio.stop(); return }
                   if (audioFiles?.length) { audio.playFiles(audioFiles); return }
                   if (page.fonText) audio.speak(page.fonText)
                 }}
@@ -736,7 +739,7 @@ function MobileCard({
             audioEl={hasAudio ? (
               <button
                 onClick={() => {
-                  if (audio.playing) { audio.toggle(); return }
+                  if (audio.playing) { audio.stop(); return }
                   if (audioFiles?.length) { audio.playFiles(audioFiles); return }
                   if (page.fonText) audio.speak(page.fonText)
                 }}
@@ -1008,7 +1011,7 @@ export function StoryReader({ book }: { book: Book }) {
   /* ── Audio : fichiers pré-enregistrés ou TTS ── */
   const hasAudio = !!(currentAudioFiles?.length || currentFon)
   const handleSpeak = useCallback(() => {
-    if (audio.playing) { audio.toggle(); return }
+    if (audio.playing) { audio.stop(); return }
     if (currentAudioFiles?.length) { audio.playFiles(currentAudioFiles); return }
     if (currentFon) audio.speak(currentFon)
   }, [audio, currentAudioFiles, currentFon])
